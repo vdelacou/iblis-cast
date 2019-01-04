@@ -1,0 +1,16 @@
+service: iblis-cast
+
+provider:
+  name: aws
+  runtime: python2.7
+  stage: staging
+  region: eu-west-3
+  
+functions:
+  getRss:
+    handler: handler.getRss
+    timeout: 20 # default is 6 seconds
+    events:
+      - http:
+          path: getrss
+          method: get
