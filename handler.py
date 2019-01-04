@@ -16,7 +16,7 @@ def getRss(event, context):
         count =  5
 
     ydl_opts = {        
-        'format': '([protocol=https]/[protocol=http])[height<=' + quality + '][ext=mp4]/best',
+        'format': '([protocol=https]/[protocol=http])bestvideo[height<='+quality+'][ext=mp4]/best[height<='+quality+']/best',
         'playlistend': count,
         'ignoreerrors': True,
         'quiet': True,
@@ -47,7 +47,7 @@ def getRss(event, context):
         if not video:
             print('ERROR: Unable to get info. Continuing...')
             continue
- 
+
         if video.get('duration'):
             duration = video.get('duration')
         else:
