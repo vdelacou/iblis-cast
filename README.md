@@ -2,8 +2,6 @@
 
 _**Convert any YouTube channel or playlist to a RSS feed compatible with all your podcast app.**_
 
-[![build status](https://travis-ci.org/vdelacou/iblis-cast.svg)](https://travis-ci.org/vdelacou/iblis-cast)
-
 
 ## Why
 
