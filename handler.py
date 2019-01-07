@@ -3,20 +3,30 @@ from rfeed import *
 from youtube_dl import YoutubeDL
 import datetime
 
+# Use Api Gateway to call the lambda function with Lambda Proxy integration
+# The parameters are :
+#   - url : the url where to find the videos
+#   - quality : the maximum quality for the video (default 720)
+#   - count : the number of item in the RSS feed (default 5)
+# eg: ?url=XXXX&quality=XXXX&count=XXXX
 def getRss(event, context):
-    # get the parameters
-    playlist_url = event['queryStringParameters']['url']
+
+    # get the parameters from API Gateway
+    playlist_url = event['queryStringParameters']['url'] # url is mandatory
+    # get quality if present
     if 'quality' in event['queryStringParameters']:
         quality = event['queryStringParameters']['quality']
     else:
-        quality = "720"
+        quality = "720" # default quality is 720
+    # get count if present
     if 'count' in event['queryStringParameters']:
         count = int(event['queryStringParameters']['count'])
     else:
-        count =  5
+        count =  5  # default item in feed is 5
 
-    ydl_opts = {        
-        'format': '([protocol=https]/[protocol=http])bestvideo[height<='+quality+'][ext=mp4]/best[height<='+quality+']/best',
+    ydl_opts = {     
+        # we prefer in http and mp4 or webm and we try to get the quality or lower
+        'format': '([protocol=https]/[protocol=http])bestvideo+bestaudio[height<='+quality+'][ext=mp4]/best[height<='+quality+']/best', # if not found, we asked for best
         'playlistend': count,
         'ignoreerrors': True,
         'quiet': True,
@@ -26,12 +36,14 @@ def getRss(event, context):
         # get all information from the given url
         result = ydl.extract_info(playlist_url, download=False)
 
-    # Initialize the RSS items
+    # initialize the RSS items list
     items = []
-    # Get first episode thumbnail for main feed picture
+    # we use the first video thumbnail for rss feed picture
     first_thumbnail = None
     # Get first episode uploader for main feed
     first_uploader = None
+    # Get first episode uploader playlist name for main feed
+    first_uploader_playlist = None
 
     # if not a playlist we add video to an array
     video_list = []
@@ -48,10 +60,33 @@ def getRss(event, context):
             print('ERROR: Unable to get info. Continuing...')
             continue
 
+        # get the Duration
         if video.get('duration'):
             duration = video.get('duration')
         else:
             duration = 0
+
+        # get the Size
+        video_size = 0
+        if video.get('filesize'):
+            video_size = video.get('filesize')
+
+        # we use the first video Thumbnail as the Feed Thumbnail  
+        if not first_thumbnail:
+            first_thumbnail = video.get('thumbnail')
+        
+        # get the name of the uploader of the first video
+        if not first_uploader:
+            if video.get('duration'):
+                first_uploader = video.get('uploader')
+            else:
+                first_uploader = ""
+        
+        # if have a playlist name in the first video 
+        if not first_uploader_playlist:
+            if video.get('playlist'):
+                first_uploader_playlist = video.get('playlist')
+
         # create itunes item   
         itunes_item = iTunesItem(
             author = video.get('uploader'),
@@ -59,18 +94,8 @@ def getRss(event, context):
             duration = datetime.timedelta(seconds=duration),
             subtitle = video.get('title'),
             summary = video.get('description'))
+       
         # create item
-        video_size = 0
-        if video.get('filesize'):
-            video_size = video.get('filesize')
-        if not first_thumbnail:
-            first_thumbnail = video.get('thumbnail')
-        if not first_uploader:
-            if video.get('duration'):
-                first_uploader = video.get('uploader')
-            else:
-                first_uploader = ""
-             
         item = Item(
             title = video.get('title'),
             link =  video.get('webpage_url'),
@@ -83,7 +108,7 @@ def getRss(event, context):
         # add item to the list
         items.append(item)
 
-    # Create the itunes feed 
+    # create the itunes feed 
     itunes = iTunes(
         author = first_uploader,
         subtitle = first_uploader,
@@ -92,14 +117,26 @@ def getRss(event, context):
         categories = iTunesCategory(name = 'TV & Film'),
         owner = iTunesOwner(name = first_uploader, email = result['id']) )
 
+    # if have playlist name is used
+    if not first_uploader_playlist:
+        title = first_uploader
+    else:
+        # if it's from channel, not use the playlist name
+        if "Uploads from " in first_uploader_playlist:
+            title = first_uploader
+        else:
+            title = first_uploader_playlist
+
+    # create the main feed
     feed = Feed(
-        title = first_uploader,
+        title = title,
         link = playlist_url,
         description =  result['title'],
         lastBuildDate = datetime.datetime.now(),
         items = items,
         extensions = [itunes])
 
+    # return response with xml content-type
     response = {
         "statusCode": 200,
         "headers": {'Content-Type': 'text/xml'},
