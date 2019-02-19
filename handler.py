@@ -8,7 +8,8 @@ import datetime
 #   - url : the url where to find the videos
 #   - quality : the maximum quality for the video (default 720)
 #   - count : the number of item in the RSS feed (default 5)
-# eg: ?url=XXXX&quality=XXXX&count=XXXX
+#   - filterTitle : display the item in the feed only if the word in filter is in the video title
+# eg: ?url=XXXX&quality=XXXX&count=XXXX&filter=XXXX
 def getRss(event, context):
 
     # get the parameters from API Gateway
@@ -23,10 +24,21 @@ def getRss(event, context):
         count = int(event['queryStringParameters']['count'])
     else:
         count =  5  # default item in feed is 5
+    # get filterTitle if present
+    if 'filterTitle' in event['queryStringParameters']:
+        filterTitle = event['queryStringParameters']['filterTitle']
+    else:
+        filterTitle = None
+
+    # for daylimotion you need to choose m3u8 protocol to pass the 403 error (cookies problem)
+    if 'dailymotion'.upper() in playlist_url.upper():
+        formatDowload = '[height<='+quality+'][protocol^=m3u8]'
+    else:
+        formatDowload = '([protocol=https]/[protocol=http])bestvideo+bestaudio[height<='+quality+'][ext=mp4]/best[height<='+quality+']/best' # if not found, we asked for best
 
     ydl_opts = {     
         # we prefer in http and mp4 or webm and we try to get the quality or lower
-        'format': '([protocol=https]/[protocol=http])bestvideo+bestaudio[height<='+quality+'][ext=mp4]/best[height<='+quality+']/best', # if not found, we asked for best
+        'format': formatDowload,
         'playlistend': count,
         'ignoreerrors': True,
         'quiet': True,
@@ -64,10 +76,10 @@ def getRss(event, context):
         if video.get('duration'):
             duration = video.get('duration')
         else:
-            duration = 0
+            duration = 10
 
         # get the Size
-        video_size = 0
+        video_size = 1000
         if video.get('filesize'):
             video_size = video.get('filesize')
 
@@ -95,18 +107,25 @@ def getRss(event, context):
             subtitle = video.get('title'),
             summary = video.get('description'))
        
+        url = video.get('url')
+
         # create item
         item = Item(
             title = video.get('title'),
-            link =  video.get('webpage_url'),
-            description = video.get('description'),
+            link = url,
+            description = video.get('description') + ' ' + video.get('webpage_url'),
             author = video.get('uploader'),
             guid = Guid(video.get('id')), 
             pubDate = datetime.datetime.strptime(video.get('upload_date'), '%Y%m%d'),
-            enclosure = Enclosure(url=video.get('url'), length=video_size, type='video/'+video.get('ext')),
+            enclosure = Enclosure(url=url, length=video_size, type='video/'+video.get('ext')),
             extensions = [itunes_item])
         # add item to the list
-        items.append(item)
+        if not filterTitle:
+            items.append(item) 
+        else:
+            if filterTitle.upper() in video.get('title').upper():
+                items.append(item)              
+        
 
     # create the itunes feed 
     itunes = iTunes(
