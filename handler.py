@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from rfeed import *
 from youtube_dl import YoutubeDL
 import datetime
+import logging
 
 # Use Api Gateway to call the lambda function with Lambda Proxy integration
 # The parameters are :
@@ -9,7 +10,7 @@ import datetime
 #   - quality : the maximum quality for the video (default 720)
 #   - count : the number of item in the RSS feed (default 5)
 #   - filterTitle : display the item in the feed only if the word in filter is in the video title
-# eg: ?url=XXXX&quality=XXXX&count=XXXX&filter=XXXX
+# eg: ?url=XXXX&quality=XXXX&count=XXXX&filterTitle=XXXX
 def getRss(event, context):
 
     # get the parameters from API Gateway
@@ -109,14 +110,24 @@ def getRss(event, context):
        
         url = video.get('url')
 
+        description = ''
+        if video.get('description'):
+            description = video.get('description')
+        webpage_url = ''            
+        if video.get('webpage_url'):
+            webpage_url = video.get('webpage_url')
+        upload_date = datetime.datetime.now()            
+        if video.get('upload_date'):
+            upload_date = datetime.datetime.strptime(video.get('upload_date'), '%Y%m%d')
+
         # create item
         item = Item(
             title = video.get('title'),
             link = url,
-            description = video.get('description') + ' ' + video.get('webpage_url'),
+            description = description + ' ' + webpage_url,
             author = video.get('uploader'),
             guid = Guid(video.get('id')), 
-            pubDate = datetime.datetime.strptime(video.get('upload_date'), '%Y%m%d'),
+            pubDate = upload_date,
             enclosure = Enclosure(url=url, length=video_size, type='video/'+video.get('ext')),
             extensions = [itunes_item])
         # add item to the list
@@ -127,14 +138,22 @@ def getRss(event, context):
                 items.append(item)              
         
 
-    # create the itunes feed 
+    # create the itunes feed
+    title = playlist_url
+    logging.warning(result) 
+    if 'title' in result:
+        title = result['title']
+    email = result['webpage_url_basename']
+    if 'id' in result:
+        email = result['id']
+
     itunes = iTunes(
         author = first_uploader,
         subtitle = first_uploader,
-        summary = result['title'],
+        summary = title,
         image = first_thumbnail,
         categories = iTunesCategory(name = 'TV & Film'),
-        owner = iTunesOwner(name = first_uploader, email = result['id']) )
+        owner = iTunesOwner(name = first_uploader, email = email) )
 
     # if have playlist name is used
     if not first_uploader_playlist:
@@ -150,7 +169,7 @@ def getRss(event, context):
     feed = Feed(
         title = title,
         link = playlist_url,
-        description =  result['title'],
+        description =  title,
         lastBuildDate = datetime.datetime.now(),
         items = items,
         extensions = [itunes])
