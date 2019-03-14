@@ -139,10 +139,10 @@ def getRss(event, context):
         
 
     # create the itunes feed
-    title = playlist_url
+    summary = playlist_url
     logging.warning(result) 
     if 'title' in result:
-        title = result['title']
+        summary = result['title']
     email = result['webpage_url_basename']
     if 'id' in result:
         email = result['id']
@@ -150,14 +150,14 @@ def getRss(event, context):
     itunes = iTunes(
         author = first_uploader,
         subtitle = first_uploader,
-        summary = title,
+        summary = summary,
         image = first_thumbnail,
         categories = iTunesCategory(name = 'TV & Film'),
         owner = iTunesOwner(name = first_uploader, email = email) )
 
     # if have playlist name is used
     if not first_uploader_playlist:
-        title = first_uploader
+        title = summary
     else:
         # if it's from channel, not use the playlist name
         if "Uploads from " in first_uploader_playlist:
