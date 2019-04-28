@@ -1798,6 +1798,14 @@ def parse_resolution(s):
     return {}
 
 
+def parse_bitrate(s):
+    if not isinstance(s, compat_str):
+        return
+    mobj = re.search(r'\b(\d+)\s*kbps', s)
+    if mobj:
+        return int(mobj.group(1))
+
+
 def month_by_name(name, lang='en'):
     """ Return the number of a month by (locale-independently) English name """
 
@@ -1914,7 +1922,7 @@ def int_or_none(v, scale=1, default=None, get_attr=None, invscale=1):
         return default
     try:
         return int(v) * invscale // scale
-    except ValueError:
+    except (ValueError, TypeError):
         return default
 
 
@@ -1935,7 +1943,7 @@ def float_or_none(v, scale=1, invscale=1, default=None):
         return default
     try:
         return float(v) * invscale / scale
-    except ValueError:
+    except (ValueError, TypeError):
         return default
 
 
